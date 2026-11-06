@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="no-referrer">
+  <title>Dilou · devoirs UTC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <!-- Temps réel seulement (canal « dilou ») : si ce script ne charge pas, la page vérifie toutes les 30 s.
+       supabase.js et non supabase.min.js : c'est le fichier publié sur npm (déjà minifié), donc son empreinte est
+       stable ; le .min.js est re-minifié par jsDelivr. L'empreinte empêche un fichier altéré de lire la clé. -->
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"
+          integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o"
+          crossorigin="anonymous"></script>
+</head>
+<body>
+  <!-- Ambiance lumineuse discrète (style Victor Studio) -->
+  <div class="ambient-torch torch-primary" aria-hidden="true"></div>
+  <div class="ambient-torch torch-secondary" aria-hidden="true"></div>
+
+  <!-- Règle verticale de défilement (Motion Studio Scroll Ruler) -->
+  <aside class="draft-vertical-ruler" id="verticalScrollRuler" aria-label="Règle verticale de progression du défilement">
+    <div class="vertical-ruler-track" id="verticalRulerTrack">
+      <!-- Ligne directrice avec ticks gradués millimétrés -->
+      <div class="vertical-ruler-ticks"></div>
+
+      <!-- Tête de lecture rouge animée au scroll -->
+      <div class="vertical-ruler-playhead" id="rulerPlayhead" style="top: 0%;">
+        <div class="playhead-pointer">
+          <span class="playhead-needle"></span>
+          <span class="playhead-flag"></span>
+        </div>
+        <div class="playhead-data">
+          <div class="playhead-pct-box playhead-pct">
+            <!-- Barre rouge qui se remplit avec le pourcentage -->
+            <div class="playhead-pct-fill" id="playheadPctFill" style="width: 0%;" aria-hidden="true"></div>
+            <!-- Texte de base clair sur fond sombre avant recouvrement -->
+            <span class="playhead-pct-label playhead-pct-base" id="playheadPctBase">0%</span>
+            <!-- Texte noir qui apparaît exactement là où le rouge recouvre -->
+            <span class="playhead-pct-label playhead-pct-covered" id="playheadPctCovered" style="clip-path: inset(0 100% 0 0);" aria-hidden="true">0%</span>
+          </div>
+          <span class="playhead-section" id="playheadSection">INTRO</span>
+        </div>
+      </div>
+
+      <!-- Repères des sections cliquables le long de la règle -->
+      <div class="vertical-ruler-anchors" id="rulerAnchors">
+        <button class="ruler-anchor-point is-active" data-ruler-target="top" aria-label="Haut de page" title="Haut de page">
+          <span class="anchor-dot"></span>
+          <span class="anchor-label">INTRO</span>
+        </button>
+        <button class="ruler-anchor-point" data-ruler-target="devoirs" aria-label="Tous les devoirs" title="Tous les devoirs">
+          <span class="anchor-dot"></span>
+          <span class="anchor-label">DEVOIRS</span>
+        </button>
+        <button class="ruler-anchor-point" data-ruler-target="calendar" aria-label="Vue calendrier" title="Vue calendrier">
+          <span class="anchor-dot"></span>
+          <span class="anchor-label">CALENDRIER</span>
+        </button>
+        <button class="ruler-anchor-point" data-ruler-target="supervision" aria-label="Espace de supervision" title="Supervision">
+          <span class="anchor-dot"></span>
+          <span class="anchor-label">SUPERVISION</span>
+        </button>
+        <button class="ruler-anchor-point" data-ruler-target="archives" aria-label="Archives" title="Archives">
+          <span class="anchor-dot"></span>
+          <span class="anchor-label">ARCHIVES</span>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="site-container">
+    <!-- Header minimaliste -->
+    <header class="header" id="appHeader">
+      <div class="header-top">
+        <div class="wordmark-group">
+          <div class="wordmark">
+            <span class="wordmark-title">UTC</span>
+            <span class="wordmark-dot">•</span>
+            <span class="wordmark-subtitle">A26 CALENDAR</span>
+          </div>
+          <span class="wordmark-caption">Tronc Commun — TC01 • Louise Dumanois</span>
+        </div>
+
+        <div class="header-actions">
+          <!-- État du robot qui lit la boîte UTC (GitHub Actions, toutes les 30 min) -->
+          <div class="robot-status" id="robotStatus" data-state="chargement" role="status">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+            <span class="robot-text">Boîte UTC…</span>
+          </div>
+          <div class="sync-badge" id="syncStatusBadge" data-state="offline" title="Connexion au calendrier partagé">
+            <span class="pulse-dot"></span>
+            <span class="sync-text">Connexion…</span>
+          </div>
+          <button class="btn btn-accent" id="btnOpenAddModal">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>Nouveau devoir</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Barre de contrôle : Métriques & Sélecteur de vue -->
+      <div class="controls-bar">
+        <div class="view-switch" role="tablist">
+          <button class="view-tab is-active" id="tabActive" data-view="active" role="tab" aria-selected="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+            <span>Tous les devoirs</span>
+            <span class="tab-badge" id="countActive">0</span>
+          </button>
+
+          <button class="view-tab" id="tabCalendar" data-view="calendar" role="tab" aria-selected="false">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            <span>Vue calendrier</span>
+          </button>
+
+          <button class="view-tab" id="tabArchived" data-view="archived" role="tab" aria-selected="false">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+            <span>Archives</span>
+            <span class="tab-badge" id="countArchived">0</span>
+          </button>
+
+          <button class="view-tab" id="tabSupervision" data-view="supervision" role="tab" aria-selected="false">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <span>Supervision</span>
+            <span class="tab-badge badge-supervision" id="countSupervision">0</span>
+          </button>
+        </div>
+
+        <!-- Jauge de complétion minimale -->
+        <div class="progress-container">
+          <div class="progress-info">
+            <span class="progress-label">Exercices réalisés :</span>
+            <strong class="progress-numbers" id="subtaskProgressRatio">0 / 0</strong>
+            <span class="progress-percent" id="subtaskProgressPercent">(0%)</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-bar" id="progressBar" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filtre par matière -->
+      <div class="filters-row" id="courseFilters">
+        <button class="filter-pill is-active" data-course="ALL">Toutes les matières</button>
+        <button class="filter-pill" data-course="LA21">Espagnol <span class="pill-dot"></span></button>
+        <button class="filter-pill" data-course="MT03">Maths 3 <span class="pill-dot"></span></button>
+        <button class="filter-pill" data-course="MT02">Maths 2 <span class="pill-dot"></span></button>
+        <button class="filter-pill" data-course="PS21">PS21 <span class="pill-dot"></span></button>
+        <button class="filter-pill" data-course="IS00">ISO <span class="pill-dot"></span></button>
+        <button class="filter-pill" data-course="GE28">Droit <span class="pill-dot"></span></button>
+        <button class="filter-pill" data-course="NP90">NP90 & PS90 <span class="pill-dot"></span></button>
+        <button class="filter-pill" data-course="CAMPUS">Campus & autres</button>
+      </div>
+    </header>
+
+    <!-- Zone de contenu -->
+    <main class="content-area">
+      <!-- En-tête de section -->
+      <div class="section-title-wrap" id="sectionHeader">
+        <h1 class="view-title" id="viewTitle">Devoirs & Exercices en cours</h1>
+        <p class="view-subtitle" id="viewSubtitle">Sélectionnez les exercices traités ou validez le devoir complet pour l'archiver.</p>
+      </div>
+
+      <!-- Aucun état reçu (ni serveur ni copie locale) : ne jamais laisser croire qu'il n'y a rien à faire -->
+      <div class="sans-donnees" id="sansDonnees" role="status" hidden>
+        <h3 class="sans-donnees-titre" id="sansDonneesTitre">Chargement du calendrier…</h3>
+        <p class="sans-donnees-texte" id="sansDonneesTexte"></p>
+      </div>
+
+      <!-- Bande « Aujourd'hui » : dû aujourd'hui et demain, évaluations des 7 prochains jours -->
+      <section class="today-strip" id="todayStrip" aria-label="Aujourd'hui et prochains jours"></section>
+
+      <!-- Vue 1 & 3 : Grille de cartes de devoirs (À faire & Archives) -->
+      <div class="tasks-grid" id="tasksGrid">
+        <!-- Rendu dynamique en JavaScript -->
+      </div>
+
+      <!-- Vue 2 : Vue Calendrier par semaine -->
+      <div class="calendar-view" id="calendarView" style="display: none;">
+        <!-- Barre de navigation de semaine -->
+        <div class="calendar-nav-bar">
+          <div class="calendar-nav-title-group">
+            <h2 class="calendar-week-label" id="calendarWeekLabel">Semaine du 21 au 27 septembre 2026</h2>
+            <span class="calendar-week-sub" id="calendarWeekSub">Semaine 3 — Automne 2026</span>
+          </div>
+          <div class="calendar-nav-actions">
+            <button class="btn btn-outline btn-sm" id="btnPrevWeek" title="Semaine précédente">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              <span>Précédente</span>
+            </button>
+            <button class="btn btn-outline btn-sm" id="btnCurrentWeek">Aujourd'hui</button>
+            <button class="btn btn-outline btn-sm" id="btnNextWeek" title="Semaine suivante">
+              <span>Suivante</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Grille des 7 jours de la semaine -->
+        <div class="calendar-week-grid" id="calendarWeekGrid">
+          <!-- Rendu dynamique des 7 colonnes en JavaScript -->
+        </div>
+      </div>
+
+      <!-- Vue 4 : Espace de Supervision Utilisateur (Human-In-The-Loop) -->
+      <div class="supervision-view" id="supervisionView" style="display: none;">
+        <div class="supervision-hero">
+          <div class="supervision-hero-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+          </div>
+          <div>
+            <h2 class="supervision-hero-title">Arbitrage & Supervision Humaine (HITL)</h2>
+            <p class="supervision-hero-desc">Ces courriels ont été détectés comme importants par l'agent, mais présentent une ambiguïté (date limite implicite, consigne sans exercices découpés, ou démarche administrative). Vous pouvez créer le devoir en 1 clic ou classer l'information.</p>
+          </div>
+        </div>
+
+        <div class="supervision-grid" id="supervisionGrid">
+          <!-- Rendu dynamique des cartes de supervision en JavaScript -->
+        </div>
+
+        <div class="supervision-empty" id="supervisionEmpty" style="display: none;">
+          <div class="empty-icon">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+          </div>
+          <h3 class="empty-title">Aucun courriel en attente de supervision</h3>
+          <p class="empty-desc">Tous les courriels reçus ont été catégorisés avec certitude ou validés.</p>
+        </div>
+      </div>
+
+      <!-- État vide -->
+      <div class="empty-state" id="emptyState" style="display: none;">
+        <div class="empty-icon">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </div>
+        <h3 class="empty-title">Tout est à jour</h3>
+        <p class="empty-desc">Aucun devoir en attente dans cette catégorie. Profitez de votre temps libre !</p>
+      </div>
+    </main>
+
+    <!-- Footer minimaliste -->
+    <footer class="footer">
+      <div class="footer-left">
+        <span class="footer-sig">DILOU • CALENDAR WORKFLOW</span>
+        <span class="footer-meta">Calendrier partagé entre les Macs de Louise · boîte UTC lue automatiquement</span>
+      </div>
+      <div class="footer-right">
+        <button type="button" id="btnRefresh" class="footer-link">Actualiser le calendrier</button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Modal d'ajout de devoir -->
+  <div class="modal-backdrop" id="addModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>Nouveau devoir</h2>
+        <button class="modal-close" id="btnCloseModal" aria-label="Fermer">✕</button>
+      </div>
+      <form id="addHomeworkForm">
+        <div class="form-group">
+          <label for="taskTitle">Intitulé du devoir</label>
+          <input type="text" id="taskTitle" required placeholder="Ex: TD3 — Intégrales et séries">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="taskCourse">Matière / UV</label>
+            <select id="taskCourse" required>
+              <option value="LA21">Espagnol (LA21)</option>
+              <option value="MT03">Maths 3 (MT03)</option>
+              <option value="MT02">Maths 2 (MT02)</option>
+              <option value="PS21">PS21 (Mécanique)</option>
+              <option value="IS00">ISO (IS00)</option>
+              <option value="GE28">Droit (GE28)</option>
+              <option value="NP90">NP90 & PS90 (Nano-projet)</option>
+              <option value="CAMPUS">Vie Campus / Autre</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="taskKind">Type</label>
+            <select id="taskKind">
+              <option value="devoir">Devoir</option>
+              <option value="evaluation">Évaluation / examen (fond rouge)</option>
+              <option value="evenement">Événement (créneau)</option>
+              <option value="rdv">Rendez-vous (créneau)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row form-row-3">
+          <div class="form-group">
+            <label for="taskDueDate">Date</label>
+            <input type="date" id="taskDueDate" required>
+          </div>
+          <div class="form-group">
+            <label for="taskTime">Heure (optionnel)</label>
+            <input type="time" id="taskTime">
+          </div>
+          <div class="form-group">
+            <label for="taskEndTime">Fin (optionnel)</label>
+            <input type="time" id="taskEndTime">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="taskLocation">Lieu (optionnel)</label>
+          <input type="text" id="taskLocation" placeholder="Ex: Salle FA104, Centre Pierre Guillaumat">
+        </div>
+
+        <div class="form-group">
+          <label for="taskDue">Libellé d'affichage (optionnel)</label>
+          <input type="text" id="taskDue" placeholder="Ex: Jeudi 24 sept. (TD)">
+        </div>
+
+        <div class="form-group">
+          <label>Exercices / Sous-éléments à faire</label>
+          <div id="subtasksInputList" class="subtasks-input-list">
+            <div class="subtask-row">
+              <input type="text" class="input-subtask" placeholder="Ex: Exercice 1">
+              <button type="button" class="btn-remove-subtask">✕</button>
+            </div>
+          </div>
+          <button type="button" class="btn btn-outline btn-sm" id="btnAddSubtaskRow">
+            + Ajouter un exercice
+          </button>
+        </div>
+
+        <div class="form-group">
+          <label for="taskNotes">Remarques ou consignes particulières</label>
+          <textarea id="taskNotes" rows="2" placeholder="Ex: Sans calculatrice, à déposer sur Moodle..."></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" id="btnCancelModal">Annuler</button>
+          <button type="submit" class="btn btn-accent">Enregistrer le devoir</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Écran de liaison : ce Mac n'a pas encore (ou plus) de clé d'accès -->
+  <div class="liaison" id="ecranLiaison" hidden>
+    <div class="liaison-carte">
+      <span class="liaison-marque">UTC <span class="wordmark-dot">•</span> DILOU</span>
+      <h1 class="liaison-titre">Ce Mac n'est pas encore relié au calendrier</h1>
+      <p class="liaison-texte">Colle ici le lien reçu de Victor (ou la clé seule). Il n'est demandé qu'une fois sur ce Mac.</p>
+      <form class="liaison-form" id="formLiaison" autocomplete="off">
+        <input type="text" id="champLiaison" spellcheck="false" autocapitalize="off" aria-label="Lien ou clé d'accès" placeholder="Lien complet ou clé">
+        <button type="submit" class="btn btn-accent">Relier ce Mac</button>
+      </form>
+      <p class="liaison-message" id="messageLiaison" role="status"></p>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast"></div>
+
+  <script src="config.js"></script>
+  <script src="donnees.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
