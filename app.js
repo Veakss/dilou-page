@@ -395,7 +395,7 @@ function updateSyncBadge() {
     : 'Vérifié toutes les 30 secondes.';
 }
 
-const LECTURE_EN_RETARD_MS = 3 * 3600 * 1000;   // le robot passe toutes les 30 min
+const LECTURE_EN_RETARD_MS = 3 * 3600 * 1000;   // le robot passe toutes les heures (et à la demande)
 
 /**
  * Ce que dit l'état du robot, sans toucher à la page (essayé par « tests/essai_page.sh logique »).
@@ -451,7 +451,7 @@ function decrireRobot(robot, queue, maintenant = Date.now()) {
     etat = 'attente';
     message = 'Robot pas encore passé';
   }
-  return { etat, message, details: details.join('\n') || 'Le robot lit la boîte UTC toutes les 30 minutes.' };
+  return { etat, message, details: details.join('\n') || 'Le robot lit la boîte UTC toutes les heures, et tout de suite avec « Actualiser ».' };
 }
 
 function updateRobotStatus() {
@@ -685,11 +685,29 @@ function setupEventListeners() {
     }
   });
 
-  // Actualiser à la demande
+  // Actualiser à la demande : recharge le calendrier et demande au robot de lire la boîte UTC tout de suite (la base
+  // n'accepte qu'une demande toutes les 10 minutes). La fin du passage arrive par le temps réel ; recharge de secours.
   const btnRefresh = document.getElementById('btnRefresh');
   btnRefresh.addEventListener('click', async () => {
     await demanderRafraichissement(true);
-    showToast(AppState.isOnline ? 'Calendrier actualisé.' : 'Calendrier injoignable : copie locale affichée.', !AppState.isOnline);
+    if (!AppState.isOnline) {
+      showToast('Calendrier injoignable : copie locale affichée.', true);
+      return;
+    }
+    let message = 'Calendrier actualisé.';
+    try {
+      const rep = await D.demanderPassage();
+      if (rep && rep.lance) {
+        message = 'Calendrier actualisé · lecture des mails lancée, résultat dans une minute environ.';
+        window.setTimeout(() => demanderRafraichissement(true), 120 * 1000);
+      } else if (rep && rep.raison === 'recent') {
+        message = `Calendrier actualisé · mails déjà demandés ${quandLisible(rep.depuis) || 'à l’instant'}, `
+          + `nouvelle demande possible ${quandLisible(rep.prochain) || 'bientôt'}.`;
+      }
+    } catch (err) {
+      message = 'Calendrier actualisé (lecture des mails à la demande indisponible).';
+    }
+    showToast(message);
   });
 }
 

@@ -244,5 +244,7 @@
       appeler('dilou_ajouter_tache', { p_tache: tache, p_supervision_id: supervisionId }),
     supprimerTache: tacheId => appeler('dilou_supprimer_tache', { p_tache_id: tacheId }),
     arbitrer: (id, statut) => appeler('dilou_arbitrer', { p_id: id, p_statut: statut }),
+    /** Demande au robot de lire la boîte UTC tout de suite (une demande au plus toutes les 10 min). */
+    demanderPassage: () => appeler('dilou_demander_passage'),
   });
 })();
