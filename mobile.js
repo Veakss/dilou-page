@@ -1,8 +1,8 @@
 /**
  * Dilou — vue mobile du calendrier (téléphone, dans le navigateur).
  *
- * Sur un petit écran, la vue Calendrier devient : alertes des changements de cours signalés par mail, bascule
- * Devoirs / Emploi du temps, semaine en bandeau et le jour choisi en liste. L'emploi du temps vient de l'app
+ * Sur un petit écran, la page n'affiche que le calendrier, façon app Apple : titre du mois, sélecteur Emploi du
+ * temps / Devoirs / Alertes (changements de cours signalés par mail), semaine en bandeau, jour choisi en liste. L'emploi du temps vient de l'app
  * Calendrier d'un Mac de Louise, partagé par l'app Dilou (AppState.agenda) ; sans lui, seuls les devoirs s'affichent.
  * Inactive dans l'app Mac (qui a sa propre vue) et sur grand écran. Cocher / valider passent par les fonctions de
  * la page (toggleSubtask, toggleValidateTask) : rien de nouveau côté données.
@@ -13,8 +13,8 @@
 
   const ecran = window.matchMedia('(max-width: 760px)');
   const CLE_MODE = 'dilou-mobile-mode';
-  let mode = 'devoirs';
-  try { if (localStorage.getItem(CLE_MODE) === 'edt') mode = 'edt'; } catch { /* stockage indisponible */ }
+  let mode = 'edt';
+  try { const m = localStorage.getItem(CLE_MODE); if (m === 'devoirs' || m === 'alertes') mode = m; } catch { /* stockage indisponible */ }
   let jour = null;                 // jour affiché (AAAA-MM-JJ)
   const deplies = new Set();       // devoirs dépliés
   const alertesOuvertes = new Set();
@@ -138,6 +138,8 @@
     alerte: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 2.5 20h19z"/><path d="M12 10v4.5M12 17.5h.01"/></svg>',
     gauche: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>',
     droite: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>',
+    bas: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>',
+    plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   };
 
   function carte(t, compacte = false) {
@@ -167,41 +169,31 @@
   }
 
   function vueAlertes(liste) {
-    if (!liste.length) return '';
-    return `<section class="dm-alerts" aria-label="Changements signalés par mail">
-      <h3>${ICONE.alerte}${pluriel(liste.length, 'changement signalé', 'changements signalés')} par mail</h3>
-      ${liste.map(a => {
-        const d = a.quand ? maj(dateDe(a.quand).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })) : 'Date à préciser';
-        const vu = alertesOuvertes.has(a.id), mail = lienMail(a.mail);
-        return `<div class="dm-alert ${vu ? 'is-open' : ''}">
-          <button type="button" class="dm-alert-row" data-alerte="${esc(a.id)}" aria-expanded="${vu}">
-            <b>${esc(a.matiere || 'Cours')} · ${esc(d)}</b><span>${esc(a.titre)}</span></button>
-          ${vu ? `<div class="dm-alert-body">${a.detail ? `<p>${esc(a.detail.length > 320 ? a.detail.slice(0, 319) + '…' : a.detail)}</p>` : ''}
-            <div class="dm-actions">${a.quand ? `<button type="button" class="dm-btn" data-aller="${esc(a.quand)}">Voir ce jour-là</button>` : ''}
-            ${mail ? `<a class="dm-btn" href="${esc(mail)}" target="_blank" rel="noopener noreferrer">Ouvrir le mail</a>` : ''}</div>
-            <p class="dm-hint">Repéré dans le mail par mots-clés : à vérifier.</p></div>` : ''}
-        </div>`;
-      }).join('')}
-    </section>`;
+    if (!liste.length) return '<div class="dm-empty"><b>Aucun changement signalé</b>Les mails annonçant un cours annulé, déplacé ou en distanciel apparaîtront ici.</div>';
+    return `<div class="dm-group">${liste.map(a => {
+      const d = a.quand ? maj(dateDe(a.quand).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })) : 'Date à préciser';
+      const vu = alertesOuvertes.has(a.id), mail = lienMail(a.mail);
+      return `<div class="dm-alert ${vu ? 'is-open' : ''}" style="--c:${a.matiere && a.matiere !== 'CAMPUS' ? couleur(a.matiere) : 'var(--dm-orange)'}">
+        <button type="button" class="dm-alert-row" data-alerte="${esc(a.id)}" aria-expanded="${vu}">
+          <span class="dm-alert-dot"></span>
+          <span class="dm-alert-text"><b>${esc(a.titre)}</b><small>${esc(a.matiere || 'Cours')} · ${esc(d)}</small></span>
+          <span class="dm-chev">${vu ? ICONE.bas : ICONE.droite}</span></button>
+        ${vu ? `<div class="dm-alert-body">${a.detail ? `<p>${esc(a.detail.length > 320 ? a.detail.slice(0, 319) + '…' : a.detail)}</p>` : ''}
+          <div class="dm-actions">${a.quand ? `<button type="button" class="dm-btn" data-aller="${esc(a.quand)}">Voir ce jour</button>` : ''}
+          ${mail ? `<a class="dm-btn" href="${esc(mail)}" target="_blank" rel="noopener noreferrer">Ouvrir le mail</a>` : ''}</div>
+          <p class="dm-hint">Repéré dans le mail par mots-clés, à vérifier.</p></div>` : ''}
+      </div>`;
+    }).join('')}</div>`;
   }
 
   function vueSemaine(jours, t0) {
-    const lundi = dateDe(jours[0]), dimanche = dateDe(jours[6]);
-    const titre = lundi.getMonth() === dimanche.getMonth()
-      ? `${lundi.getDate()} – ${dimanche.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`
-      : `${lundi.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} – ${dimanche.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`;
-    return `<div class="dm-week">
-        <button type="button" class="dm-icon" data-semaine="-1" aria-label="Semaine précédente">${ICONE.gauche}</button>
-        <button type="button" class="dm-week-title" data-semaine="0">${esc(titre)}${jours.includes(t0) ? '' : '<small>Revenir à aujourd’hui</small>'}</button>
-        <button type="button" class="dm-icon" data-semaine="1" aria-label="Semaine suivante">${ICONE.droite}</button>
-      </div>
-      <div class="dm-strip">${jours.map(iso => {
-        const d = dateDe(iso), a = AppState.tasks.filter(t => t.dueDate === iso && ouvert(t) && visible(t));
-        const ev = a.some(evaluation);
-        return `<button type="button" class="dm-day ${iso === jour ? 'is-current' : ''} ${iso === t0 ? 'is-today' : ''} ${iso < t0 ? 'is-past' : ''}" data-jour="${iso}">
-          <span>${esc(d.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', ''))}</span><b>${d.getDate()}</b>
-          ${a.length ? `<em class="${ev ? 'is-eval' : ''}">${a.length}</em>` : '<em class="is-empty"></em>'}</button>`;
-      }).join('')}</div>`;
+    const lettres = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+    return `<div class="dm-strip">${jours.map((iso, i) => {
+      const d = dateDe(iso), a = AppState.tasks.filter(t => t.dueDate === iso && ouvert(t) && visible(t));
+      const cls = [iso === jour ? 'is-current' : '', iso === t0 ? 'is-today' : '', iso < t0 ? 'is-past' : ''].join(' ');
+      return `<button type="button" class="dm-day ${cls}" data-jour="${iso}" aria-label="${esc(d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }))}${a.length ? ', ' + pluriel(a.length, 'devoir', 'devoirs') : ''}">
+        <span>${lettres[i]}</span><b>${d.getDate()}</b><i class="${a.length ? (a.some(evaluation) ? 'is-eval' : 'is-on') : ''}"></i></button>`;
+    }).join('')}</div>`;
   }
 
   function vueDevoirs(iso) {
@@ -282,13 +274,23 @@
       const liste = alertes();
       const d = dateDe(jour), ecart = Math.round((d - dateDe(t0)) / 86400000);
       const relatif = ecart === 0 ? 'Aujourd’hui' : ecart === 1 ? 'Demain' : ecart === -1 ? 'Hier' : '';
-      racine.innerHTML = vueAlertes(liste)
-        + `<div class="dm-mode" role="group" aria-label="Affichage">
-            <button type="button" data-mode="devoirs" aria-pressed="${mode === 'devoirs'}">${ICONE.liste}Devoirs</button>
-            <button type="button" data-mode="edt" aria-pressed="${mode === 'edt'}">${ICONE.horloge}Emploi du temps</button></div>`
-        + vueSemaine(jours, t0)
-        + `<h2 class="dm-day-title">${esc(maj(d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })))}${relatif ? `<small>${relatif}</small>` : ''}</h2>`
-        + `<div class="dm-list">${mode === 'edt' ? vueEmploi(jour, liste) : vueDevoirs(jour)}</div>`;
+      const mois = maj(d.toLocaleDateString('fr-FR', d.getFullYear() === new Date().getFullYear() ? { month: 'long' } : { month: 'long', year: 'numeric' }));
+      const horsLigne = AppState.isOnline === false && AppState.etatRecu;
+      const onglet = (m, nom, extra = '') => `<button type="button" data-mode="${m}" aria-pressed="${mode === m}">${nom}${extra}</button>`;
+      racine.innerHTML = `<header class="dm-top">
+          <div class="dm-top-title"><h1>${esc(mode === 'alertes' ? 'Alertes' : mois)}</h1>${horsLigne ? '<small>Hors connexion</small>' : ''}</div>
+          ${mode === 'alertes' ? '' : `${jours.includes(t0) ? '' : '<button type="button" class="dm-link" data-semaine="0">Aujourd’hui</button>'}
+            <button type="button" class="dm-round" data-semaine="-1" aria-label="Semaine précédente">${ICONE.gauche}</button>
+            <button type="button" class="dm-round" data-semaine="1" aria-label="Semaine suivante">${ICONE.droite}</button>`}
+          <button type="button" class="dm-round is-tint" data-ajouter="1" aria-label="Nouveau devoir">${ICONE.plus}</button>
+        </header>
+        <div class="dm-mode" role="group" aria-label="Affichage">
+          ${onglet('edt', 'Emploi du temps')}${onglet('devoirs', 'Devoirs')}${onglet('alertes', 'Alertes', liste.length ? `<em>${liste.length}</em>` : '')}
+        </div>`
+        + (mode === 'alertes' ? vueAlertes(liste)
+          : vueSemaine(jours, t0)
+            + `<h2 class="dm-day-title">${esc(maj(d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })))}${relatif ? `<small>${relatif}</small>` : ''}</h2>`
+            + `<div class="dm-list">${mode === 'edt' ? vueEmploi(jour, liste) : vueDevoirs(jour)}</div>`);
     } catch (err) {
       console.warn('Dilou mobile :', err);
     }
@@ -302,10 +304,10 @@
   }
 
   function surClic(e) {
-    const b = e.target.closest('[data-mode], [data-semaine], [data-jour], [data-deplier], [data-sub], [data-valider], [data-alerte], [data-aller]');
+    const b = e.target.closest('[data-mode], [data-semaine], [data-jour], [data-deplier], [data-sub], [data-valider], [data-alerte], [data-aller], [data-ajouter]');
     if (!b) return;
     if (b.dataset.mode) {
-      mode = b.dataset.mode === 'edt' ? 'edt' : 'devoirs';
+      mode = ['edt', 'devoirs', 'alertes'].includes(b.dataset.mode) ? b.dataset.mode : 'edt';
       try { localStorage.setItem(CLE_MODE, mode); } catch { /* rien */ }
       return rendre();
     }
@@ -316,7 +318,17 @@
       return allerSemaine(plus(new Date(AppState.calendarMonday), 7 * n));
     }
     if (b.dataset.jour) { jour = b.dataset.jour; return rendre(); }
-    if (b.dataset.aller) { jour = b.dataset.aller; return allerSemaine(dateDe(b.dataset.aller)); }
+    if (b.dataset.aller) { jour = b.dataset.aller; mode = 'edt'; return allerSemaine(dateDe(b.dataset.aller)); }
+    if (b.dataset.ajouter) {
+      // « Nouveau devoir » de la page, avec la date du jour affiché déjà remplie
+      const bouton = document.getElementById('btnOpenAddModal');
+      if (!bouton) return;
+      bouton.click();
+      const date = jour;
+      const remplir = () => { const champ = document.getElementById('taskDueDate'); if (champ) { champ.value = date; champ.dispatchEvent(new Event('input', { bubbles: true })); champ.dispatchEvent(new Event('change', { bubbles: true })); } };
+      remplir(); setTimeout(remplir, 0);
+      return;
+    }
     if (b.dataset.alerte) {
       if (alertesOuvertes.has(b.dataset.alerte)) alertesOuvertes.delete(b.dataset.alerte); else alertesOuvertes.add(b.dataset.alerte);
       return rendre();
