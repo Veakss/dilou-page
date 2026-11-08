@@ -280,7 +280,9 @@ function gererErreurServeur(err) {
  * Ne redessine que si quelque chose a réellement changé (pas de clignotement des cartes).
  */
 function appliquerEtat(etat, depuisCache, forcer = false) {
-  const avant = JSON.stringify([AppState.tasks, AppState.supervisionItems]);
+  const avant = JSON.stringify([AppState.tasks, AppState.supervisionItems, AppState.agenda]);
+  // Emploi du temps partagé par un Mac (app Calendrier), affiché par la vue mobile ; null s'il n'y en a pas
+  AppState.agenda = etat.agenda && Array.isArray(etat.agenda.events) ? etat.agenda : null;
   const taches = Array.isArray(etat.tasks) ? etat.tasks.filter(t => t && t.status !== 'supprimee') : [];
   copieServeur = new Map(taches.map(t => [t.id, structuredClone(t)]));
   AppState.tasks = taches.map(t => appliquerEnvoisEnCours(structuredClone(t)));
@@ -291,7 +293,7 @@ function appliquerEtat(etat, depuisCache, forcer = false) {
   if (typeof etat.revision === 'number') AppState.revision = depuisCache ? null : etat.revision;
   const premier = !AppState.etatRecu;
   AppState.etatRecu = true;
-  const apres = JSON.stringify([AppState.tasks, AppState.supervisionItems]);
+  const apres = JSON.stringify([AppState.tasks, AppState.supervisionItems, AppState.agenda]);
   if (avant !== apres || depuisCache || forcer || premier) renderApp();
   else verifierChangementDeJour();   // mêmes données, mais peut-être plus le même jour
   updateRobotStatus();

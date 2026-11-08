@@ -246,5 +246,8 @@
     arbitrer: (id, statut) => appeler('dilou_arbitrer', { p_id: id, p_statut: statut }),
     /** Demande au robot de lire la boîte UTC tout de suite (une demande au plus toutes les 10 min). */
     demanderPassage: () => appeler('dilou_demander_passage'),
+    /** Emploi du temps lu par l'app Dilou dans l'app Calendrier d'un Mac, partagé avec le téléphone. */
+    publierAgenda: (de, a, evenements) =>
+      appeler('dilou_agenda_publier', { p_de: de, p_a: a, p_evenements: evenements }),
   });
 })();
